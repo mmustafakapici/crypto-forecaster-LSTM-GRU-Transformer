@@ -1,0 +1,52 @@
+# ROCm-SAFE BACKTEST CONFIG
+device: auto
+
+logging:
+  debug: true        # shape/log gör
+
+data:
+  tickers: ["BTC-USD", "ETH-USD", "SOL-USD"]
+  start: "2018-01-01"
+  end:   "2025-01-01"
+  interval: "1d"
+  features: ["Open","High","Low","Close","Volume"]
+  seq_len: 60
+  train_ratio: 0.7
+  val_ratio: 0.15
+  add_ticker_id: true   # embedding AÇIK olacaksa true kalsın
+
+model:
+  type: lstm
+  hidden_size: 128
+  num_layers: 1         # ✅ dropout çekirdeğini devre dışı bırakmak için tek katman
+  dropout: 0.0          # ✅ ROCm-safe
+  norm: null
+  ticker_embedding_dim: 8   # embedding LSTM dropout’tan bağımsız; sorun çıkarmaz
+  transformer: {}
+
+train:
+  epochs: 1             # walk-forward içinde kısa train yaptığımız için burada kritik değil
+  batch_size: 128
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  gradient_clip: 1.0
+  mixed_precision: false     # ✅ ROCm-safe
+  compile: false             # ✅ ROCm-safe
+  deterministic: true
+
+strategy:
+  threshold_long: 0.0005
+  threshold_short: 0.0005
+  transaction_cost_bps: 5
+  hold_flat: false
+
+backtest:
+  n_splits: 4
+  epochs: 2            # her split için kısa eğitim
+  results_dir: artifacts/backtest
+
+artifacts:
+  dir: artifacts
+  tb_dir: artifacts/tb
+  ckpt_best: artifacts/model.best.pt
+  ckpt_last: artifacts/model.last.pt

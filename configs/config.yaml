@@ -1,0 +1,70 @@
+seed: 42
+device: "auto"
+
+data:
+  tickers: ["BTC-USD", "ETH-USD"]
+  start: "2017-01-01"
+  end: null
+  interval: "1d"
+  features: ["Open", "High", "Low", "Close", "Volume"]
+  seq_len: 60
+  train_ratio: 0.7
+  val_ratio: 0.15
+  add_ticker_id: true
+
+model:
+  type: "lstm"          # lstm | gru | transformer
+  hidden_size: 128
+  num_layers: 2
+  dropout: 0.2
+  norm: null
+  ticker_embedding_dim: 8
+  transformer:
+    nhead: 4
+    dim_feedforward: 256
+    activation: "gelu"
+
+train:
+  batch_size: 128
+  epochs: 30
+  lr: 0.001
+  weight_decay: 0.0001
+  gradient_clip: 1.0
+  mixed_precision: true
+  compile: true
+
+early_stopping:
+  patience: 7
+  min_delta: 0.0
+  monitor: "val_loss"
+
+save:
+  model_path: "artifacts/model.pt"
+  best_model_path: "artifacts/model.best.pt"
+  last_model_path: "artifacts/model.last.pt"
+  scaler_path: "artifacts/scaler.pkl"
+  metrics_path: "artifacts/metrics.json"
+
+logging:
+  tensorboard_dir: "artifacts/tb"
+  log_interval: 50
+  debug: true
+
+dist:
+  ddp: false
+  backend: "nccl"
+
+strategy:
+  threshold_long: 0.0
+  threshold_short: 0.0
+  transaction_cost_bps: 5
+  hold_flat: false
+
+backtest:
+  mode: "walk_forward"
+  n_splits: 4
+  epochs: 10
+  overlap: false
+  results_dir: "artifacts/backtest"
+
+

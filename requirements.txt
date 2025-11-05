@@ -1,0 +1,4 @@
+# Bu dosya bilgilendirme amaçlıdır.
+# Lütfen profilinize göre aşağıdakilerden birini kurun:
+#  - requirements.base.txt + requirements.torch.cpu.txt   (CPU/CUDA - PyPI)
+#  - requirements.base.txt + requirements.torch.rocm.txt  (AMD ROCm 6.4)
