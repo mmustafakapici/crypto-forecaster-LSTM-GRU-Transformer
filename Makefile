@@ -1,9 +1,12 @@
 export PYTHONPATH := $(PWD)
 
+# ==== Venv / Python Ayarları ====
+VENV     ?= .venv
+PY       ?= $(VENV)/bin/python
+PIP      ?= $(VENV)/bin/pip
+
 # ==== Config ====
 CONFIG    ?= configs/config.yaml
-PY        ?= python
-PIP       ?= pip
 GPUS      ?= 2
 
 REQ_BASE  ?= requirements.base.txt
@@ -17,21 +20,40 @@ SHELL := /bin/bash
 .PHONY: help
 help:
 	@echo "Targets:"
-	@echo "  make install            # (varsayılan) CPU/CUDA PyPI profili (base + cpu)"
-	@echo "  make install-cpu        # CPU/CUDA PyPI profili (base + cpu)"
-	@echo "  make install-amd        # AMD ROCm 6.4 profili (base + rocm)"
+	@echo "  make venv               # .venv ortamını oluştur"
+	@echo "  make install            # (varsayılan) venv + base + cpu kur"
+	@echo "  make install-cpu        # venv + base + cpu profili"
+	@echo "  make install-amd        # venv + base + rocm profili"
 	@echo "  make env                # Python/pip/torch ve cihaz bilgisi"
 	@echo "  make cuda-info          # CUDA/ROCm bilgisi (scripts/cuda_info.py)"
 	@echo "  make train              # modeli eğit (--config=$(CONFIG))"
-	@echo "  make eval               # test setinde değerlendirme (--config=$(CONFIG))\n\t@echo "  make backtest           # walk-forward backtest (PnL/Sharpe)""
+	@echo "  make eval               # test setinde değerlendirme (--config=$(CONFIG))"
+	@echo "  make backtest           # walk-forward backtest (PnL/Sharpe)"
 	@echo "  make tb                 # TensorBoard aç (artifacts/tb)"
 	@echo "  make ddp GPUS=N         # torchrun ile DDP eğitim"
 	@echo "  make streamlit          # Streamlit arayüzünü başlat"
 	@echo "  make freeze             # requirements-lock.txt üret"
 	@echo "  make clean              # çıktı/önbellek temizle"
+
+# ==== Venv Oluşturma ====
+.PHONY: venv
+venv:
+	@if command -v python3 >/dev/null 2>&1; then \
+		PYBIN=python3; \
+	elif command -v python >/dev/null 2>&1; then \
+		PYBIN=python; \
+	else \
+		echo "❌ Python bulunamadı. Lütfen python3 kur."; \
+		exit 1; \
+	fi; \
+	$$PYBIN -m venv $(VENV); \
+	$(VENV)/bin/python -m pip install --upgrade pip; \
+	echo "✔ Venv oluşturuldu: $(VENV)"
+	
+
 # ==== Setup ====
 .PHONY: install
-install: install-cpu
+install: venv install-cpu
 
 .PHONY: install-cpu
 install-cpu:
@@ -39,7 +61,7 @@ install-cpu:
 	$(PIP) install -r $(REQ_CPU)
 
 .PHONY: install-amd
-install-amd:
+install-amd: venv
 	$(PIP) install -r $(REQ_BASE)
 	$(PIP) install -r $(REQ_ROCM)
 
@@ -54,7 +76,7 @@ env:
 cuda-info:
 	$(PY) scripts/cuda_info.py
 
-# ==== Train / Eval ====
+# ==== Train / Eval / Backtest ====
 .PHONY: train
 train:
 	$(PY) -m src.cli --config $(CONFIG) --mode train
@@ -63,20 +85,24 @@ train:
 eval:
 	$(PY) -m src.cli --config $(CONFIG) --mode eval
 
+.PHONY: backtest
+backtest:
+	$(PY) -m src.cli --config $(CONFIG) --mode backtest
+
 # ==== TensorBoard ====
 .PHONY: tb
 tb:
-	tensorboard --logdir artifacts/tb
+	$(VENV)/bin/tensorboard --logdir artifacts/tb
 
 # ==== DDP ====
 .PHONY: ddp
 ddp:
-	torchrun --nproc_per_node=$(GPUS) -m src.cli --config $(CONFIG) --mode train --ddp 1
+	$(VENV)/bin/torchrun --nproc_per_node=$(GPUS) -m src.cli --config $(CONFIG) --mode train --ddp 1
 
 # ==== Streamlit ====
 .PHONY: streamlit
 streamlit:
-	PYTHONPATH=. streamlit run streamlit_app/app.py
+	PYTHONPATH=. $(PY) -m streamlit run streamlit_app/app.py
 
 # ==== Utilities ====
 .PHONY: freeze
@@ -89,33 +115,6 @@ clean:
 	rm -rf __pycache__ .pytest_cache .mypy_cache **/__pycache__ artifacts/* *.egg-info
 	@echo "✔ Temizlendi."
 
-
-.PHONY: backtest
-backtest:
-	$(PY) -m src.cli --config $(CONFIG) --mode backtest
-
-
-.PHONY: train-rocm-safe
-train-rocm-safe:
-	$(PY) -m src.cli --config configs/config.rocm-safe.yaml --mode train
-
-
 .PHONY: report
 report:
 	$(PY) scripts/make_backtest_report.py
-
-
-.PHONY: backtest-rocm-safe
-backtest-rocm-safe:
-	$(PY) -m src.cli --config configs/config.backtest.rocm-safe.yaml --mode backtest
-
-
-
-.PHONY: streamlit-rocm-safe
-streamlit-rocm-safe:
-	# ROCm tarafında JIT'i sakinleştiren güvenli bayraklar
-	# (gfx1030 için HSA_OVERRIDE_GFX_VERSION bazen gerekli)
-	MIOPEN_FIND_MODE=1 HSA_OVERRIDE_GFX_VERSION=10.3.0 \
-	PYTHONPATH=. streamlit run streamlit_app/app.py -- \
-	  --config configs/config.backtest.rocm-safe.yaml \
-	  --rocm-safe

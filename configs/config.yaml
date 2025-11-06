@@ -13,7 +13,7 @@ data:
   add_ticker_id: true
 
 model:
-  type: "lstm"          # lstm | gru | transformer
+  type: "transformer"          # lstm | gru | transformer
   hidden_size: 128
   num_layers: 2
   dropout: 0.2
